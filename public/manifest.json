@@ -1,0 +1,17 @@
+{
+  "name": "Notes App",
+  "short_name": "Notes",
+  "description": "Encrypted notes app with Supabase",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

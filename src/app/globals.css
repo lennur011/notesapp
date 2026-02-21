@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 220 33% 98%;
+  --fg: 222 47% 11%;
+  --card: 0 0% 100%;
+  --muted: 215 16% 47%;
+  --border: 214 32% 90%;
+  --accent: 159 84% 39%;
+}
+
+.dark {
+  --bg: 222 47% 7%;
+  --fg: 210 40% 96%;
+  --card: 224 44% 12%;
+  --muted: 215 20% 66%;
+  --border: 216 34% 22%;
+  --accent: 159 84% 42%;
+}
+
+body {
+  @apply bg-bg text-fg antialiased;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.app-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(16, 185, 129, 0.12), transparent 35%),
+    radial-gradient(circle at 85% 0%, rgba(14, 165, 233, 0.16), transparent 30%),
+    hsl(var(--bg));
+}
+
+.note-card {
+  @apply rounded-2xl border border-border bg-card/90 shadow-sm backdrop-blur;
+}
