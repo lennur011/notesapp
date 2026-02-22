@@ -9,9 +9,15 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/app-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    },
+    {
+      "src": "/app-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable any"
     }
   ]
 }

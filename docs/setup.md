@@ -21,6 +21,7 @@ npm install
 4. In Supabase Auth URL settings:
    - Set Site URL: `http://localhost:3000` (local)
    - Add Redirect URL: `http://localhost:3000/auth/callback`
+   - Add your deployed URL callback too: `https://<your-domain>/auth/callback`
 
 ## 4) Environment variables
 Copy `.env.example` to `.env.local` and fill values:
@@ -28,7 +29,6 @@ Copy `.env.example` to `.env.local` and fill values:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<PROJECT-REF>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY>
-NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ## 5) Run
@@ -38,3 +38,8 @@ npm run dev
 ```
 
 Visit `http://localhost:3000`.
+
+## 6) Signup + sign-in behavior
+- `/login` now supports both sign in and sign up with email/password.
+- "Continue with Google" supports both new account signup and returning users.
+- New users may need email confirmation if enabled in Supabase Auth settings.

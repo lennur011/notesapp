@@ -6,7 +6,11 @@ import { Toaster } from 'sonner';
 export const metadata: Metadata = {
   title: 'Notes App',
   description: 'Full-stack encrypted notes app',
-  manifest: '/manifest.json'
+  manifest: '/manifest.json',
+  icons: {
+    icon: '/app-logo.png',
+    apple: '/app-logo.png'
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

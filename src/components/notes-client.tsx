@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { decryptNoteContent, encryptNoteContent, isEncryptedContent } from '@/lib/encryption';
@@ -35,9 +35,17 @@ export default function NotesClient({ initialNotes }: Props) {
   const [uploading, setUploading] = useState(false);
   const [imagePaths, setImagePaths] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const editorRef = useRef<HTMLDivElement | null>(null);
 
   const supabase = createClient();
   const { resolvedTheme, setTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === 'dark';
+  const canEditBody = !selected?.is_password_protected || isUnlocked;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (initialNotes.length) {
@@ -45,6 +53,16 @@ export default function NotesClient({ initialNotes }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!editorRef.current || !canEditBody) {
+      return;
+    }
+
+    if (editorRef.current.innerHTML !== content) {
+      editorRef.current.innerHTML = content || '';
+    }
+  }, [content, canEditBody]);
 
   const filtered = useMemo(() => {
     const list = notes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()));
@@ -61,6 +79,23 @@ export default function NotesClient({ initialNotes }: Props) {
     });
   }, [notes, search, sortBy]);
 
+  const hydrateContentImages = (html: string, paths: string[], signedUrls: string[]) => {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const pathToUrl = new Map(paths.map((path, index) => [path, signedUrls[index] ?? '']));
+
+    wrapper.querySelectorAll('img[data-note-path]').forEach((img) => {
+      const path = img.getAttribute('data-note-path');
+      if (!path) return;
+      const signedUrl = pathToUrl.get(path);
+      if (signedUrl) {
+        img.setAttribute('src', signedUrl);
+      }
+    });
+
+    return wrapper.innerHTML;
+  };
+
   const resolveSignedUrls = async (paths: string[]) => {
     if (!paths.length) {
       setImageUrls([]);
@@ -75,6 +110,19 @@ export default function NotesClient({ initialNotes }: Props) {
     );
 
     setImageUrls(signed.filter(Boolean));
+    if (content) {
+      const refreshed = hydrateContentImages(content, paths, signed);
+      if (refreshed !== content) {
+        setContent(refreshed);
+      }
+    }
+  };
+
+  const applyFormat = (command: string, value?: string) => {
+    if (!canEditBody || !editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false, value);
+    setContent(editorRef.current.innerHTML);
   };
 
   const resetEditor = () => {
@@ -84,7 +132,7 @@ export default function NotesClient({ initialNotes }: Props) {
     setProtect(false);
     setNotePassword('');
     setUnlockPassword('');
-    setIsUnlocked(false);
+    setIsUnlocked(true);
     setImagePaths([]);
     setImageUrls([]);
   };
@@ -213,13 +261,31 @@ export default function NotesClient({ initialNotes }: Props) {
     setUploading(false);
 
     if (!response.ok) {
-      toast.error('Upload failed');
+      const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
+      toast.error(errorPayload?.error ?? 'Upload failed');
       return;
     }
 
     const data = (await response.json()) as { image_paths: string[]; image_urls: string[] };
     setImagePaths(data.image_paths);
     setImageUrls(data.image_urls);
+
+    const newPaths = data.image_paths.filter((path) => !imagePaths.includes(path));
+    if (newPaths.length) {
+      const snippets = newPaths
+        .map((path, index) => {
+          const signedUrl = data.image_urls[data.image_paths.indexOf(path)] ?? '';
+          return signedUrl
+            ? `<p><img src="${signedUrl}" data-note-path="${path}" alt="Attached image" /></p>`
+            : '';
+        })
+        .filter(Boolean)
+        .join('');
+
+      if (snippets) {
+        setContent((prev) => `${prev}${snippets}`);
+      }
+    }
 
     const updatedNote = { ...selected, image_urls: data.image_paths };
     setSelected(updatedNote);
@@ -304,11 +370,14 @@ export default function NotesClient({ initialNotes }: Props) {
 
           <div className="mt-6 hidden items-center gap-2 md:flex">
             <button
-              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              onClick={() => {
+                if (!mounted) return;
+                setTheme(isDarkTheme ? 'light' : 'dark');
+              }}
               className="rounded-lg border border-border p-2"
               aria-label="Toggle theme"
             >
-              {resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              {mounted && isDarkTheme ? <Sun size={16} /> : <Moon size={16} />}
             </button>
             <button onClick={logout} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
               <LogOut size={15} /> Logout
@@ -342,13 +411,36 @@ export default function NotesClient({ initialNotes }: Props) {
                 </div>
               </div>
             ) : (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your note in markdown or plain text"
-                rows={14}
-                className="mt-4 w-full resize-y rounded-xl border border-border bg-card p-3 text-sm outline-none"
-              />
+              <>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => applyFormat('bold')} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold">
+                    Bold
+                  </button>
+                  <button type="button" onClick={() => applyFormat('italic')} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold">
+                    Italic
+                  </button>
+                  <button type="button" onClick={() => applyFormat('underline')} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold">
+                    Underline
+                  </button>
+                  <button type="button" onClick={() => applyFormat('insertUnorderedList')} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold">
+                    Bullet list
+                  </button>
+                  <button type="button" onClick={() => applyFormat('formatBlock', '<h2>')} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold">
+                    Heading
+                  </button>
+                  <button type="button" onClick={() => applyFormat('removeFormat')} className="rounded-md border border-border bg-card px-2 py-1 text-xs font-semibold">
+                    Clear
+                  </button>
+                </div>
+                <div
+                  ref={editorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={(e) => setContent((e.currentTarget as HTMLDivElement).innerHTML)}
+                  className="mt-3 min-h-[22rem] w-full rounded-xl border border-border bg-card p-3 text-sm outline-none"
+                />
+                {!content ? <p className="mt-2 text-xs text-muted">Start writing your note...</p> : null}
+              </>
             )}
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -399,11 +491,14 @@ export default function NotesClient({ initialNotes }: Props) {
       <nav className="fixed inset-x-0 bottom-0 border-t border-border bg-card/95 p-3 backdrop-blur md:hidden">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <button
-            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            onClick={() => {
+              if (!mounted) return;
+              setTheme(isDarkTheme ? 'light' : 'dark');
+            }}
             className="rounded-lg border border-border p-2"
             aria-label="Toggle theme"
           >
-            {resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {mounted && isDarkTheme ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <button onClick={resetEditor} className="rounded-lg bg-accent px-4 py-2 text-sm text-white">
             New note
